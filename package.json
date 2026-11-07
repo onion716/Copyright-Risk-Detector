@@ -1,0 +1,56 @@
+{
+  "name": "dsh-virtual-product-risk",
+  "version": "1.0.6",
+  "private": false,
+  "description": "小红书虚拟商品违规风险检测工作台：对商品名称、标题、正文、配图与交付文件做本地规则筛查与 DeepSeek 复核，输出风险分级、命中明细、改写建议与运营处置建议。",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "dsh": ">=0.2.0-rc.2 || >=0.2.1-rc.2 || >=0.2.2-rc.1"
+  },
+  "license": "MIT",
+  "author": "onion716",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/onion716/Copyright-Risk-Detector.git"
+  },
+  "homepage": "https://github.com/onion716/Copyright-Risk-Detector",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "virtual-product",
+    "copyright",
+    "risk",
+    "workbench"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./assets/*.json": "./assets/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "assets/*.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}

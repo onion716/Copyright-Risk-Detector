@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "title": "Xiaohongshu virtual product risk check",
+    "description": "Upload a virtual product's name, title, body and images; check copyright, slang and banned-word risk against a local lexicon and a DeepSeek model, with grading and handling advice."
+  },
+  "panel": {
+    "title": "Xiaohongshu virtual product risk check",
+    "subtitle": "Local copyright / slang / banned-word lexicon plus a DeepSeek review. Results are review leads, not legal conclusions."
+  }
+}
