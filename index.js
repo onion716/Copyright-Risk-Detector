@@ -421,7 +421,13 @@ function buildIndexes(db, slang, banned) {
     }
   }
   slangItems.sort((a, b) => b.v.length - a.v.length)
-  const bannedItems = banned.terms.map((t) => ({ v: norm(t.term), term: t }))
+  // 正常交付方式 / 商品形态组标记 scan:false，不参与标题正文扫描，避免误伤虚拟商品正常经营。
+  const bannedItems = banned.terms
+    .filter((t) => {
+      const group = (banned.groups || {})[t.group] || {}
+      return group.scan !== false
+    })
+    .map((t) => ({ v: norm(t.term), term: t }))
   bannedItems.sort((a, b) => b.v.length - a.v.length)
   const nameItems = []
   for (const r of db.records) {
@@ -490,14 +496,38 @@ function scoreHits(hits) {
       if (h.liveness === 'killed' || h.risk === 'danger' || h.policy === 'grey') { level = 'red'; reasons.push('拦截词或高危暗语') }
       else { if (level !== 'red') level = 'amber'; reasons.push('暗语') }
     } else if (h.kind === 'banned') {
-      if (h.level === 'red') { level = 'red'; reasons.push('售假高频词') }
-      else { if (level !== 'red') level = 'amber'; reasons.push(h.group_name) }
+      // 用分组名代替固定的“售假高频词”，避免把破解、账号禁售、极限词都误标成售假。
+      if (h.level === 'red') { level = 'red'; reasons.push(h.group_name || '平台禁售词') }
+      else { if (level !== 'red') level = 'amber'; reasons.push(h.group_name || '平台稽查词') }
     }
   }
   return { level, reasons: unique(reasons) }
 }
 
 const LEVEL_NAMES = { red: '红灯', amber: '黄灯', green: '绿灯' }
+
+function adviseBannedHits(hits, banned, rules) {
+  const list = hits.filter((h) => h.kind === 'banned')
+  if (!list.length) return advise('no_match', null, rules)
+  const red = list.find((h) => h.level === 'red')
+  const top = red || list[0]
+  const level = red ? 'red' : 'amber'
+  const group = ((banned && banned.groups) || {})[top.group] || {}
+  return {
+    level,
+    levelName: rules.levels[level].name,
+    score: level === 'red' ? 70 : 40,
+    headline: (top.group_name || '违禁词') + '：命中 ' + list.length + ' 个词',
+    title: rules.levels[level].title,
+    meaning: unique(list.map((h) => h.advice || group.advice || '').filter(Boolean)),
+    actions: [...(group.actions || [])],
+    docs: [...(group.docs || [])],
+    alternatives: [],
+    platforms: {},
+    checklist: [...(rules.checklist || [])],
+    notice: rules.notice || '',
+  }
+}
 
 function lintText(db, text, indexes, rules, T) {
   const src = String(text ?? '').normalize('NFKC').slice(0, 4000)
@@ -563,9 +593,15 @@ function lintText(db, text, indexes, rules, T) {
     if (!worst || rank < worst.rank) worst = { rank, hit: h }
   }
   let card
-  if (worst) {
-    const status = worst.rank < 2 ? 'matched' : worst.rank === 2 ? 'candidates' : 'disguised'
+  if (worst && worst.rank < 2) {
+    card = advise('matched', worst.hit.record, rules)
+  } else if (bHits.some((h) => h.level === 'red')) {
+    card = adviseBannedHits(bHits, indexes.banned, rules)
+  } else if (worst) {
+    const status = worst.rank === 2 ? 'candidates' : 'disguised'
     card = advise(status, worst.hit.record, rules)
+  } else if (bHits.length) {
+    card = adviseBannedHits(bHits, indexes.banned, rules)
   } else card = advise('no_match', null, rules)
   return {
     text: src, level, levelName: LEVEL_NAMES[level], reasons,
@@ -854,6 +890,12 @@ const SYSTEM_PROMPT = `你是「虚拟商品违规风险检测」助手，专注
 5. 配图与交付文件：图片、PPT、Word、Excel、ZIP 里出现或提取出的文字，以及图片中的品牌 Logo、课程封面、影视截图、二维码、联系方式、水印等。
 6. 平台规则：小红书站外导流/联系方式、类目与下架风险、私信规则、AI 生成内容与虚假种草、大健康医疗敏感词、涉未成年人等（见用户消息里的「平台规则要点」）。
 
+重要平台口径（必须遵守，避免误判正常虚拟商品）：
+- 小红书支持「个人售卖」，也支持店铺「电子资源」类目和官方自动发货；知识库、模板、PPT、课件、图片、资料等虚拟商品，通过网盘链接、飞书文档链接、邮箱或官方发货链接交付，都属于正常履约方式，不是售假。
+- 不得仅因出现「秒发」「自动发货」「网盘链接」「网盘发货」「电子版」「PDF版」「发货链接」「网盘」等词，判定售假或侵权。
+- 售假/假冒只指：冒充品牌方或官方正品、售卖盗版复制件、伪造授权、以假充真。必须结合商品名称、内容来源、授权信息与实际交付物判断，不能只凭单个词。
+- 自有原创的虚拟商品用上述方式交付，属于正常经营，不要因为交付方式本身扣分。
+
 要求：
 - 明确区分「词库命中线索」与「你的判断」，不要夸大，也不要因为没命中就判定安全。
 - 给每一条发现一个明确的依据与可执行的改写建议。
@@ -900,7 +942,7 @@ function buildUserText(input, local) {
   }
   if (local.rulesText) {
     lines.push('')
-    lines.push('平台规则要点（参考，来源于知识星球规则整理）：')
+    lines.push('平台规则要点（参考，来源于平台公开规则与知识星球整理）：')
     lines.push(local.rulesText)
   }
   lines.push('')
@@ -1078,7 +1120,7 @@ export function apply(ctx, config) {
     updatedAt: db.updated_at || '',
     names: db.records.filter((r) => r.object_type !== '店铺' && r.category !== '店铺来源提醒').length,
     slang: slang.terms.length,
-    banned: banned.terms.length,
+    banned: banned.terms.filter((t) => ((banned.groups || {})[t.group] || {}).scan !== false).length,
     platformRules: (platformRules.categories || []).length,
     xhsRules: (xhsRules.categories || []).reduce((a, c) => a + ((c.rules || []).length), 0),
     libraryCats: libraryCats.length,
@@ -1276,3 +1318,6 @@ export function apply(ctx, config) {
 
   ctx.logger && ctx.logger.info && ctx.logger.info('dsh-virtual-product-risk: ready (%d names)', stats.names)
 }
+
+// 供本地单元测试使用；不影响插件运行时导出。
+export const __test = { loadJson, normalizeRiskLibrary, normalizeHandling, buildIndexes, lintText, queryOne, pinyinTable }

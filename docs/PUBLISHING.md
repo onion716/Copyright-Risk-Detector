@@ -127,7 +127,7 @@ description:
 ## 六、验证记录与限制
 
 - ✅ 宿主端：`index.js` 与 `client.js` 通过 Node 语法检查；`package.json`/`locale` 通过 JSON 校验；`icon.svg` 为合法 SVG（843 字节，远小于 256 KiB 上限）。
-- ✅ 规则引擎：以真实样例跑通 `analyze`（「粉bi课堂 公考全套网盘秒发 / 国家级名师 100%押题 / 克劳德代充」→ 红灯，命中版权候选 1、暗语 3、违禁/极限词 6，并生成处置卡）。
+- ✅ 规则引擎：以真实样例跑通 `analyze`（「粉bi课堂 公考课程 / 国家级名师 100%押题 / 克劳德代充」→ 红灯，命中版权候选、极限词与破解/账号类禁售词，并生成处置卡）。
 - ✅ 客户端渲染：用伪 React 渲染空状态与「带结果」两种界面均无异常，红灯、命中明细、DeepSeek 复核、改写建议、处置建议、合规四查都能渲染。
 - ✅ 已安装：`plugin_manager` 安装返回 `application: applied`；`list_plugins` 显示 `include:virtual-product-risk` 为 `active`；客户端 `Slots` 显示 `sidebar.panellist` 与 `main` 都有 `virtual-product-risk` 占用者且 `active: true`。
 - ⚠️ 未验证：受宿主的浏览器 Cookie 鉴权限制，我**无法**从命令行直接调用 `/virtual-product-risk/api/*`（返回 403 是预期的安全拦截），也**无法**在 Electron 窗口里点开工作台截图。真实的大模型调用与最终视觉效果需要你在 GUI 里点一次「开始检测」确认。
