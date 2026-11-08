@@ -2,7 +2,7 @@
 
 一个 **DeepSeek Harness** 插件：在小红书虚拟商品上架 / 交付前，对**商品名称、标题、正文、封面配图、交付文件**做一次违规与版权风险检测——先用本地规则库离线筛查，再交给 DeepSeek 大模型识图 / 读文档复核，输出**风险分级、命中明细、改写建议与运营处置建议**。
 
-[![npm version](https://img.shields.io/npm/v/dsh-virtual-product-risk)](https://www.npmjs.com/package/dsh-virtual-product-risk) [![npm mirror](https://img.shields.io/badge/npmmirror-1.1.0-1677ff)](https://npmmirror.com/package/dsh-virtual-product-risk)
+[![npm version](https://img.shields.io/npm/v/dsh-virtual-product-risk)](https://www.npmjs.com/package/dsh-virtual-product-risk) [![npm mirror](https://img.shields.io/badge/npmmirror-1.1.1-1677ff)](https://npmmirror.com/package/dsh-virtual-product-risk)
 
 ![检测结果](https://raw.githubusercontent.com/onion716/Copyright-Risk-Detector/main/docs/images/ui-result.png)
 

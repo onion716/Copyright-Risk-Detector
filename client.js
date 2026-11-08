@@ -220,6 +220,8 @@ window.__ModuleLoader__.load({
 .vpr-app{display:flex;gap:18px;align-items:stretch}
 .vpr-app > .vpr-side{flex:0 0 248px;min-width:0}
 .vpr-app > .vpr-main{flex:1 1 auto;min-width:0}
+.vpr-main > .vpr-lib-main{height:100%;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.vpr-main > .vpr-lib-main > .vpr-lib-body{flex:1 1 auto;min-height:0;overflow:auto;scrollbar-gutter:stable}
 
 .vpr-side{background:var(--vpr-surface);border:1px solid var(--vpr-border);border-radius:14px;padding:10px;overflow:auto}
 .vpr-side-check{display:flex;width:100%;align-items:center;gap:9px;border:0;background:var(--vpr-active-bg);color:var(--vpr-active-fg);font:inherit;font-size:13px;font-weight:600;text-align:left;cursor:pointer;border-radius:9px;padding:10px 11px;box-shadow:0 1px 2px var(--vpr-shadow-strong)}
