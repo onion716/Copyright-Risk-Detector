@@ -1,6 +1,6 @@
 {
   "name": "dsh-virtual-product-risk",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": false,
   "description": "小红书虚拟商品违规风险检测工作台：对商品名称、标题、正文、配图与交付文件做本地规则筛查与 DeepSeek 复核，输出风险分级、命中明细、改写建议与运营处置建议。",
   "type": "module",

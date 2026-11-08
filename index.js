@@ -1284,12 +1284,56 @@ export function apply(ctx, config) {
           try { fsWriteUpdateStatus({ ok: null, state: 'running', version: info.latest, channel, registry: reg }) } catch (e) {}
           try {
             pm.updateBundle('dsh-virtual-product-risk', info.latest, { registry: reg }).then((r) => {
-              try { fsWriteUpdateStatus({ ok: true, version: info.latest, channel, registry: reg, result: r && r.step }) } catch (e) {}
-            }).catch((e) => { try { fsWriteUpdateStatus({ ok: false, version: info.latest, channel, registry: reg, error: String(e && e.message ? e.message : e) }) } catch (e2) {} })
+              try {
+                const app = r && r.result && r.result.application
+                const failed = app === 'failed' || app === 'cancelled' || (r && r.result && r.result.error)
+                fsWriteUpdateStatus({
+                  at: new Date().toISOString(),
+                  ok: !failed,
+                  state: 'done',
+                  version: info.latest,
+                  installedVersion: r && r.result && r.result.version,
+                  channel,
+                  registry: reg,
+                  step: r && r.step,
+                  application: app,
+                  restartReason: r && r.result && r.result.restartReason,
+                  changed: !!(r && r.result && r.result.changed),
+                })
+              } catch (e) {}
+            }).catch((e) => { try { fsWriteUpdateStatus({ at: new Date().toISOString(), ok: false, state: 'failed', version: info.latest, channel, registry: reg, error: String(e && e.message ? e.message : e) }) } catch (e2) {} })
             return writeJson(res, 200, { ok: true, started: true, current: info.current, latest: info.latest, channel, registry: reg })
           } catch (e) {
             return writeJson(res, 500, { ok: false, error: { code: 'update-failed', message: String(e && e.message ? e.message : e) } })
           }
+        }
+        if (pathname === '/virtual-product-risk/api/reload') {
+          if (req.method !== 'POST') return writeJson(res, 405, { ok: false, error: { code: 'method-error', message: 'method not allowed' } })
+          const pm = ctx.get ? ctx.get('pluginManager') : undefined
+          if (!pm || typeof pm.reload !== 'function' || typeof pm.listPlugins !== 'function') {
+            return writeJson(res, 501, { ok: false, error: { code: 'no-plugin-manager', message: '当前宿主不支持插件热重载，请重启 DSH' } })
+          }
+          let row
+          try {
+            const rows = await pm.listPlugins()
+            row = (rows || []).find((x) => x && x.moduleName === 'dsh-virtual-product-risk')
+              || (rows || []).find((x) => x && String(x.entryId || '').includes('virtual-product-risk'))
+          } catch (e) {
+            return writeJson(res, 500, { ok: false, error: { code: 'reload-failed', message: String(e && e.message ? e.message : e) } })
+          }
+          if (!row) return writeJson(res, 404, { ok: false, error: { code: 'unknown-plugin', message: '未找到当前插件条目' } })
+          writeJson(res, 200, { ok: true, started: true, version: PKG_VERSION, entryId: row.entryId })
+          setTimeout(() => {
+            Promise.resolve()
+              .then(() => pm.reload([row.patchId]))
+              .then((result) => {
+                try { fsWriteUpdateStatus({ at: new Date().toISOString(), ok: true, state: 'reloaded', version: PKG_VERSION, result }) } catch (e) {}
+              })
+              .catch((e) => {
+                try { fsWriteUpdateStatus({ at: new Date().toISOString(), ok: false, state: 'reload-failed', version: PKG_VERSION, error: String(e && e.message ? e.message : e) }) } catch (e2) {}
+              })
+          }, 120)
+          return
         }
         if (pathname === '/virtual-product-risk/api/models') {
           if (req.method !== 'GET' && req.method !== 'HEAD') return writeJson(res, 405, { ok: false, error: { code: 'method-error', message: 'method not allowed' } })

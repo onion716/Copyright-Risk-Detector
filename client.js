@@ -51,7 +51,7 @@ window.__ModuleLoader__.load({
         libLoading: '加载中…', libEmpty: '该分类暂无可显示条目', libCount: '共 {n} 条', libMore: '加载更多',
         libAllGroups: '全部', source: '来源', platform: '平台',
         themeLight: '浅色', themeDark: '深色', themeAuto: '自动识别',
-        updateCheck: '检查更新', updateChecking: '检查中…', updateUpdating: '更新中…', updateAvailable: '可更新版本', updateUpToDate: '已是最新版本', updateFailed: '检查更新失败',
+        updateCheck: '检查更新', updateChecking: '检查中…', updateUpdating: '更新中…', updateAvailable: '可更新版本', updateUpToDate: '已是最新版本', updateFailed: '检查更新失败', reloadPlugin: '重载插件', reloading: '重载中…', reloadHint: '更新已安装，点击「重载插件」生效', reloadFailed: '重载失败，请重启 DSH',
       },
       en: {
         nav: 'Risk check', tabCheck: 'Check', tabLibrary: 'Library',
@@ -81,7 +81,7 @@ window.__ModuleLoader__.load({
         libTitle: 'Library', libHint: 'Rules grouped by category; pick one on the left.', libSearch: 'Search…', libSearchBtn: 'Search',
         libLoading: 'Loading…', libEmpty: 'No items', libCount: '{n} items', libMore: 'Load more', libAllGroups: 'All', source: 'Source', platform: 'Platform',
         themeLight: 'Light', themeDark: 'Dark', themeAuto: 'Auto',
-        updateCheck: 'Check updates', updateChecking: 'Checking…', updateUpdating: 'Updating…', updateAvailable: 'Update available', updateUpToDate: 'Up to date', updateFailed: 'Update check failed',
+        updateCheck: 'Check updates', updateChecking: 'Checking…', updateUpdating: 'Updating…', updateAvailable: 'Update available', updateUpToDate: 'Up to date', updateFailed: 'Update check failed', reloadPlugin: 'Reload plugin', reloading: 'Reloading…', reloadHint: 'Update installed. Click Reload plugin to apply.', reloadFailed: 'Reload failed. Restart DSH.',
       },
     }
 
@@ -343,6 +343,8 @@ window.__ModuleLoader__.load({
       const [updateInfo, setUpdateInfo] = useState(null)
       const [updateBusy, setUpdateBusy] = useState('')
       const [updateMsg, setUpdateMsg] = useState('')
+      const [reloadReady, setReloadReady] = useState(false)
+      const [reloadBusy, setReloadBusy] = useState(false)
       const [themePref, setThemePref] = useState(() => { try { return (typeof localStorage !== 'undefined' && localStorage.getItem('vpr-theme')) || 'auto' } catch (e) { return 'auto' } })
       const [sysDark, setSysDark] = useState(false)
       const isDark = themePref === 'dark' || (themePref === 'auto' && sysDark)
@@ -481,13 +483,13 @@ window.__ModuleLoader__.load({
         for (let i = 0; i < attempts; i++) {
           await new Promise((res) => setTimeout(res, 2500))
           let j = null
-          try { const r = await fetch(apiUrl('virtual-product-risk/api/update-status'), { headers: { accept: 'application/json' } }); j = await r.json() } catch (e) { return true }
+          try { const r = await fetch(apiUrl('virtual-product-risk/api/update-status'), { headers: { accept: 'application/json' } }); j = await r.json() } catch (e) { return { ok: false, status: null } }
           const st = j && j.ok ? j.status : null
-          if (!st) return true
+          if (!st) return { ok: false, status: null }
           if (st.state === 'running' || st.ok === null || st.ok === undefined) continue
-          return st.ok === true
+          return { ok: st.ok === true, status: st }
         }
-        return true
+        return { ok: false, status: null }
       }
 
       const applyUpdate = async (channel) => {
@@ -498,14 +500,33 @@ window.__ModuleLoader__.load({
           const j = await r.json().catch(() => null)
           if (!r.ok || !j || !j.ok) throw new Error((j && j.error && j.error.message) || 'update failed')
           if (j.upToDate) { setUpdateMsg(t('updateUpToDate')); setUpdateBusy(''); return }
-          setUpdateMsg('已开始更新，完成后请刷新页面…')
-          const ok = await pollUpdateStatus(24)
-          if (!ok && channel === 'cn') { setUpdateMsg('国内线路失败，改用海外线路…'); return applyUpdate('official') }
-          if (!ok) setUpdateMsg('更新失败，请稍后重试或手动更新')
+          setUpdateMsg('已开始更新，完成后可重载插件…')
+          const res = await pollUpdateStatus(24)
+          if (!res.ok && channel === 'cn') { setUpdateMsg('国内线路失败，改用海外线路…'); return applyUpdate('official') }
+          if (!res.ok) { setUpdateMsg('更新失败，请稍后重试或手动更新'); return }
+          setUpdateInfo((prev) => prev ? { ...prev, hasUpdate: false, latest: (res.status && res.status.version) || prev.latest } : prev)
+          setReloadReady(true)
+          setUpdateMsg(t('reloadHint'))
         } catch (e) {
           if (channel === 'cn') { setUpdateMsg('国内线路失败，改用海外线路…'); return applyUpdate('official') }
           setUpdateMsg('更新失败：' + (e && e.message ? e.message : String(e)))
         } finally { setUpdateBusy('') }
+      }
+
+      const onReloadClick = async () => {
+        if (reloadBusy) return
+        setReloadBusy(true)
+        setUpdateMsg('正在重载插件…')
+        try {
+          const r = await fetch(apiUrl('virtual-product-risk/api/reload'), { method: 'POST', headers: { accept: 'application/json' } })
+          const j = await r.json().catch(() => null)
+          if (!r.ok || !j || !j.ok) throw new Error((j && j.error && j.error.message) || 'reload failed')
+          setUpdateMsg('插件已重载，正在刷新页面…')
+          setTimeout(() => { try { window.location.reload() } catch (e) {} }, 2400)
+        } catch (e) {
+          setUpdateMsg(t('reloadFailed') + '：' + (e && e.message ? e.message : String(e)))
+          setReloadBusy(false)
+        }
       }
 
       const onUpdateClick = async () => {
@@ -548,8 +569,11 @@ window.__ModuleLoader__.load({
             h('span', { className: 'vpr-chip' }, t('metaXhsRules') + ' ', h('b', null, meta.xhsRules || 0))) : null),
         h('div', { className: 'vpr-head-right' },
           updateMsg ? h('span', { className: 'vpr-update-msg' }, updateMsg) : null,
-          h('button', { className: 'vpr-update' + (updateInfo && updateInfo.hasUpdate ? ' vpr-update-has' : '') + (updateBusy ? ' vpr-update-busy' : ''), title: (updateInfo && updateInfo.latest ? ('最新版本 ' + updateInfo.latest) : ''), onClick: onUpdateClick },
-            updateBusy === 'updating' ? t('updateUpdating') : updateBusy === 'checking' ? t('updateChecking') : (updateInfo && updateInfo.hasUpdate ? t('updateAvailable') : t('updateCheck'))),
+          reloadReady
+            ? h('button', { className: 'vpr-update vpr-update-has' + (reloadBusy ? ' vpr-update-busy' : ''), title: t('reloadHint'), onClick: onReloadClick },
+              reloadBusy ? t('reloading') : t('reloadPlugin'))
+            : h('button', { className: 'vpr-update' + (updateInfo && updateInfo.hasUpdate ? ' vpr-update-has' : '') + (updateBusy ? ' vpr-update-busy' : ''), title: (updateInfo && updateInfo.latest ? ('最新版本 ' + updateInfo.latest) : ''), onClick: onUpdateClick },
+              updateBusy === 'updating' ? t('updateUpdating') : updateBusy === 'checking' ? t('updateChecking') : (updateInfo && updateInfo.hasUpdate ? t('updateAvailable') : t('updateCheck'))),
           h('div', { className: 'vpr-theme' },
             [['light', t('themeLight')], ['dark', t('themeDark')], ['auto', t('themeAuto')]].map(([p, label]) =>
               h('button', { key: p, className: themePref === p ? 'vpr-theme-on' : '', title: label, onClick: () => applyTheme(p) }, label)))))
